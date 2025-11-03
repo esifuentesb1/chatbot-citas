@@ -2,30 +2,23 @@
 import express from "express";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, setDoc, doc, updateDoc } from "firebase/firestore";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getFirestore, collection, getDocs, setDoc, updateDoc } from "firebase-admin/firestore";
 
 dotenv.config();
 const app = express();
 app.use(express.json());
 
-// --- Ruta de prueba para verificar el servidor ---
-app.get("/", (req, res) => {
-  res.send("🚀 Servidor del chatbot funcionando correctamente.");
+// --- Inicializar Firebase Admin usando variable de entorno ---
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+initializeApp({
+  credential: cert(serviceAccount)
 });
 
-// --- Configuración de Firebase ---
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
-};
+const db = getFirestore();
 
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
+console.log("✅ Firebase inicializado correctamente");
 
 // --- Inicializar horarios en Firestore si no existen ---
 async function inicializarHorarios() {
@@ -66,7 +59,7 @@ async function enviarMensaje(numero, texto) {
   const opciones = {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${process.env.ACCESS_TOKEN}`,
+      "Authorization": `Bearer ${process.env.WHATSAPP_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(cuerpo),
@@ -150,4 +143,3 @@ app.listen(PORT, async () => {
   console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
   await inicializarHorarios();
 });
-
