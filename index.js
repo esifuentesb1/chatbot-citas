@@ -2,8 +2,7 @@
 import express from "express";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, collection, getDocs, setDoc, updateDoc } from "firebase-admin/firestore";
+import admin from "firebase-admin";
 
 dotenv.config();
 const app = express();
@@ -12,18 +11,18 @@ app.use(express.json());
 // --- Inicializar Firebase Admin usando variable de entorno ---
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-initializeApp({
-  credential: cert(serviceAccount)
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
 
-const db = getFirestore();
+const db = admin.firestore();
 
 console.log("✅ Firebase inicializado correctamente");
 
 // --- Inicializar horarios en Firestore si no existen ---
 async function inicializarHorarios() {
-  const horariosRef = collection(db, "horarios");
-  const snapshot = await getDocs(horariosRef);
+  const horariosRef = db.collection("horarios");
+  const snapshot = await horariosRef.get();
 
   if (snapshot.empty) {
     console.log("⚙️ No hay horarios, creando por defecto...");
@@ -37,7 +36,7 @@ async function inicializarHorarios() {
     ];
 
     for (const horario of listaHorarios) {
-      await setDoc(doc(db, "horarios", horario.id), horario);
+      await horariosRef.doc(horario.id).set(horario);
     }
 
     console.log("✅ Horarios creados correctamente en Firestore.");
@@ -104,8 +103,8 @@ app.post("/webhook", async (req, res) => {
     }
 
     else if (texto.includes("horarios")) {
-      const horariosRef = collection(db, "horarios");
-      const snapshot = await getDocs(horariosRef);
+      const horariosRef = db.collection("horarios");
+      const snapshot = await horariosRef.get();
 
       let lista = "🕒 Horarios disponibles:\n";
       snapshot.forEach(doc => {
@@ -117,12 +116,12 @@ app.post("/webhook", async (req, res) => {
     }
 
     else if (texto.includes("reservar")) {
-      const horariosRef = collection(db, "horarios");
-      const snapshot = await getDocs(horariosRef);
+      const horariosRef = db.collection("horarios");
+      const snapshot = await horariosRef.get();
 
       const primerHorario = snapshot.docs.find(d => d.data().disponible);
       if (primerHorario) {
-        await updateDoc(doc(db, "horarios", primerHorario.id), { disponible: false });
+        await horariosRef.doc(primerHorario.id).update({ disponible: false });
         await enviarMensaje(numero, `✅ Reservaste la cita de las ${primerHorario.data().hora}. ¡Te esperamos!`);
       } else {
         await enviarMensaje(numero, "❌ No hay horarios disponibles para reservar.");
